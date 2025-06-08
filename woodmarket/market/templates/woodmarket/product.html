@@ -8,6 +8,13 @@
         нет
     {% endfor %}
 </p>
+
 <h1>{{ product.title }}</h1>
+
 <p>{{ product.description|linebreaks }}</p>
+
+{% if product.photo %}
+<img class="img-article-left" src="{{ product.photo.url }}">
+{% endif %}
 {% endblock %}
+

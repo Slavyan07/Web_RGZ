@@ -57,6 +57,10 @@ INTERNAL_IPS = ['127.0.0.1']
 
 ROOT_URLCONF = 'woodmarket.urls'
 
+MEDIA_ROOT = BASE_DIR / 'media'
+
+MEDIA_URL = '/media/'
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

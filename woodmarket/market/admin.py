@@ -1,5 +1,6 @@
 from django.contrib import admin, messages
 from .models import Product, Category
+from django.utils.safestring import mark_safe
 
 def pluralize_years(years: int) -> str:
     if 11 <= years % 100 <= 14:
@@ -31,11 +32,11 @@ class WarrantyRangeFilter(admin.SimpleListFilter):
             return queryset.filter(details__warranty_years__gt=5)
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    fields = ['title', 'slug', 'description', 'cat', 'details', 'tags']
-    # readonly_fields = ['slug']
+    fields = ['title', 'slug', 'description', 'post_photo', 'photo', 'cat', 'details', 'tags']
+    readonly_fields = ['post_photo']
+    list_display = ('title', 'time_create', 'is_published', 'photo', 'cat', 'warranty_info', 'post_photo')
     filter_horizontal = ['tags']
     prepopulated_fields = {"slug": ("title",)}
-    list_display = ('title', 'time_create', 'is_published', 'cat', 'warranty_info', 'brief_info')
     list_display_links = ('title',)
     list_editable = ('is_published',)
     ordering = ['time_create', 'title']
@@ -43,9 +44,11 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ['title__startswith', 'cat__name']
     list_filter = [WarrantyRangeFilter, 'cat__name', 'is_published']
 
-    @admin.display(description="Краткое описание")
-    def brief_info(self, product: Product):
-        return f"Описание: {len(product.description)} символов."
+    @admin.display(description="Изображение ")
+    def post_photo(self, product: Product):
+        if product.photo:
+            return mark_safe(f"<img src='{product.photo.url}' width = 150 > ")
+        return "Без фото"
 
     @admin.display(description="Срок гарантии")
     def warranty_info(self, product: Product):

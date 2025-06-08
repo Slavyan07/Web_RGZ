@@ -1,14 +1,15 @@
 from django.http import  HttpResponse, HttpResponseNotFound, Http404
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Product, Category, Tag
+from .models import Product, Category, Tag, UploadFiles
+from .forms import AddProductForm, UploadFileForm
+import uuid
 # Create your views here.
 menu = [
     {'title': "О сайте", 'url_name': 'about'},
-    {'title': "Добавить товар", 'url_name': 'add_product'},
+    {'title': "Добавить изделие", 'url_name': 'add_product'},
     {'title': "Обратная связь", 'url_name': 'contact'},
     {'title': "Войти", 'url_name': 'login'},
 ]
-
 Product.objects.filter(is_published=1)
 
 Categories = Category.objects.all()
@@ -32,13 +33,46 @@ def show_product(request, product_slug):
         'menu': menu,
         'product': product,
     })
-
+# def handle_uploaded_file(f):
+#     name = f.name
+#     ext = ''
+#
+#     if '.' in name:
+#         ext = name[name.rindex('.'):]
+#         name = name[:name.rindex('.')]
+#
+#     suffix = str(uuid.uuid4())
+#     with open(f"uploads/{name}_{suffix}{ext}", "wb+") as destination:
+#         for chunk in f.chunks():
+#             destination.write(chunk)
 def about(request):
-    return render(request, 'woodmarket/about.html', {'title': 'О сайте', 'menu': menu})
+    if request.method == "POST":
+        form = UploadFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            fp = UploadFiles(file=form.cleaned_data['file'])
+            fp.save()
+    else:
+        form = UploadFileForm()
+    return render(request, 'woodmarket/about.html',{'title': 'О сайте', 'menu': menu, 'form': form})
+
 
 def add_product(request):
-    return HttpResponse("Добавить товар")
+    if request.method == 'POST':
+        form = AddProductForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                form.save()
+                return redirect('home')  # или любой другой маршрут
+            except Exception:
+                form.add_error(None, 'Ошибка добавления изделия')
+    else:
+        form = AddProductForm()
 
+    return render(request, 'woodmarket/add_product.html', {
+        'title': 'Добавление изделия',
+        'menu': menu,
+        'form': form
+    })
 def contact(request):
     return HttpResponse("Обратная связь")
 

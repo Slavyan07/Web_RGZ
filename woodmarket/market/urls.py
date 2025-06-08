@@ -1,7 +1,10 @@
 from django.urls import path, re_path, register_converter
 from market import views, converters
+from django.conf import settings
+from django.conf.urls.static import static
 
 register_converter(converters.FourDigitYearConverter,"year4")
+
 
 urlpatterns = [
  path('', views.index, name = 'home'),
@@ -16,3 +19,4 @@ urlpatterns = [
  path('product/<slug:product_slug>/', views.show_product, name='product'),
  path('tag/<slug:tag_slug>/', views.show_tag, name='tag'),
 ]
+

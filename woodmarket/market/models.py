@@ -4,7 +4,8 @@ from django.urls import reverse
 class PublishedManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(is_published=Product.Status.PUBLISHED)
-
+class UploadFiles(models.Model):
+    file = models.FileField(upload_to='uploads_model')
 class Tag(models.Model):
     name = models.CharField(max_length=50, unique=True)
     slug = models.SlugField(max_length=50, unique=True)
@@ -48,7 +49,7 @@ class Product(models.Model):
     time_update = models.DateTimeField(auto_now=True, verbose_name="Время изменения")
     is_published = models.BooleanField(choices=tuple(map(lambda x: (bool(x[0]), x[1]), Status.choices)), default=Status.DRAFT, verbose_name="Статус")
     details = models.OneToOneField(ProductDetails, on_delete=models.PROTECT,  null=True, blank=True, verbose_name="Характеристики")
-
+    photo = models.ImageField(upload_to="photos/%Y/%m/%d/", default=None, blank=True, null=True,verbose_name="Фото")
     class Meta:
         verbose_name = "Изделия"
         verbose_name_plural = "Изделия"
