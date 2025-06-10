@@ -3,7 +3,7 @@
 {% block content %}
 <p>Теги:
     {% for tag in product.tags.all %}
-        <a href="{% url 'tag' tag.slug %}">{{ tag.name }}</a>{% if not forloop.last %}, {% endif %}
+        <a href="{% url 'tag_slug' tag.slug %}">{{ tag.name }}</a>{% if not forloop.last %}, {% endif %}
     {% empty %}
         нет
     {% endfor %}
@@ -14,7 +14,17 @@
 <p>{{ product.description|linebreaks }}</p>
 
 {% if product.photo %}
-<img class="img-article-left" src="{{ product.photo.url }}">
+    <p><img class="img-article-down" src="{{ product.photo.url }}"></p>
 {% endif %}
+
+    <h3>Характеристики</h3>
+    <ul>
+        <li><strong>Срок гарантии(в годах):</strong> {{ product.details.warranty_years }}</li>
+        <li><strong>Материал:</strong> {{ product.details.material }}</li>
+        <li><strong>Размер:</strong> {{ product.details.size }}</li>
+    </ul>
+
+<p><a href="{{ product.get_absolute_url }}edit">Редактировать запись</a></p>
+<p><a href="{{ product.get_absolute_url }}delete">Удалить запись</a></p>
 {% endblock %}
 

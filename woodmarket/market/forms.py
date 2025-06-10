@@ -19,21 +19,19 @@ class RussianValidator:
 class UploadFileForm(forms.Form):
     file = forms.ImageField(label="Изображение")
 class AddProductForm(forms.ModelForm):
+    warranty_years = forms.CharField(label='Срок гарантии', required=False)
+    material = forms.CharField(label='Материал', required=False)
+    size = forms.CharField(label='Размер', required=False)
+
     cat = forms.ModelChoiceField(
         queryset=Category.objects.all(),
         empty_label="Категория не выбрана",
         label="Категория"
     )
 
-    details = forms.ModelChoiceField(
-        queryset=ProductDetails.objects.all(),
-        required=False,
-        empty_label="Не выбрано",
-        label="Характеристики"
-    )
     class Meta:
         model = Product
-        fields = ['title', 'slug', 'description', 'is_published', 'cat', 'details', 'photo']
+        fields = ['title', 'slug', 'description', 'tags', 'is_published', 'cat', 'photo']
         labels = {
             'slug': 'URL',
             'description': 'Описание'
@@ -42,6 +40,7 @@ class AddProductForm(forms.ModelForm):
             'title': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Введите название'}),
             'slug': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'только латиница'}),
             'description': forms.Textarea(attrs={'class': 'form-textarea', 'cols': 60, 'rows': 5}),
+            'tags': forms.CheckboxSelectMultiple(),
         }
 
     def clean_title(self):

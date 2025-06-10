@@ -1,118 +1,143 @@
-from django.http import  HttpResponse, HttpResponseNotFound, Http404
+from django.http import  HttpResponse, HttpResponseNotFound, Http404, HttpResponseRedirect
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Product, Category, Tag, UploadFiles
+from django.urls import reverse_lazy
+from .utils import DataMixin
+from django.core.paginator import Paginator
+
+from .models import Product, Category, Tag, ProductDetails
 from .forms import AddProductForm, UploadFileForm
-import uuid
+from django.views.generic import View, ListView, DetailView, FormView, CreateView, UpdateView, DeleteView, TemplateView
 # Create your views here.
-menu = [
-    {'title': "О сайте", 'url_name': 'about'},
-    {'title': "Добавить изделие", 'url_name': 'add_product'},
-    {'title': "Обратная связь", 'url_name': 'contact'},
-    {'title': "Войти", 'url_name': 'login'},
-]
 Product.objects.filter(is_published=1)
 
 Categories = Category.objects.all()
 
-def index(request):
-    products = Product.published.all()
-    categories = Category.objects.all()
 
-    context = {
-        'title': 'Главная страница',
-        'posts': products,
-        'categories': categories,
-        'menu': menu,
-        'cat_selected': 0,
-    }
-    return render(request, 'woodmarket/index.html', context)
-def show_product(request, product_slug):
-    product = get_object_or_404(Product, slug=product_slug)
-    return render(request, 'woodmarket/product.html', {
-        'title': product.title,
-        'menu': menu,
-        'product': product,
-    })
-# def handle_uploaded_file(f):
-#     name = f.name
-#     ext = ''
-#
-#     if '.' in name:
-#         ext = name[name.rindex('.'):]
-#         name = name[:name.rindex('.')]
-#
-#     suffix = str(uuid.uuid4())
-#     with open(f"uploads/{name}_{suffix}{ext}", "wb+") as destination:
-#         for chunk in f.chunks():
-#             destination.write(chunk)
-def about(request):
-    if request.method == "POST":
-        form = UploadFileForm(request.POST, request.FILES)
-        if form.is_valid():
-            fp = UploadFiles(file=form.cleaned_data['file'])
-            fp.save()
-    else:
-        form = UploadFileForm()
-    return render(request, 'woodmarket/about.html',{'title': 'О сайте', 'menu': menu, 'form': form})
+class ProductHome(DataMixin, ListView):
+    template_name = 'woodmarket/index.html'
+    title_page = 'Главная страница'
+    context_object_name = 'posts'
+
+    def get_queryset(self):
+        return Product.published.all().select_related('cat')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['cat_selected'] = int(self.request.GET.get('cat_id', 0))
+        return self.get_mixin_context(context)
+class ShowProduct(DataMixin, DetailView):
+    model = Product
+    template_name = 'woodmarket/product.html'
+    context_object_name = 'product'
+    slug_url_kwarg = 'slug'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return self.get_mixin_context(context, title=context['product'].title)
+
+class About(DataMixin, TemplateView):
+    template_name = 'woodmarket/about.html'
+    title_page = 'О сайте'
+class AddProduct(DataMixin, CreateView):
+    model = Product
+    template_name = 'woodmarket/add_product.html'
+    form_class = AddProductForm
+    success_url = reverse_lazy('home')
+    title_page = 'Добавление изделия'
+
+    def form_valid(self, form):
+        self.object = form.save(commit=False)
+        d = ProductDetails.objects.create(
+            warranty_years=form.cleaned_data.get('warranty_years') or 0,
+            material=form.cleaned_data.get('material') or "Не указано",
+            size=form.cleaned_data.get('size') or "Не указано"
+        )
+        self.object.details = d
+        self.object.save()
+        return redirect(self.success_url)
 
 
-def add_product(request):
-    if request.method == 'POST':
-        form = AddProductForm(request.POST, request.FILES)
-        if form.is_valid():
-            try:
-                form.save()
-                return redirect('home')  # или любой другой маршрут
-            except Exception:
-                form.add_error(None, 'Ошибка добавления изделия')
-    else:
-        form = AddProductForm()
+class UpdateProduct(DataMixin, UpdateView):
+    model = Product
+    template_name = 'woodmarket/add_product.html'
+    form_class = AddProductForm
+    success_url = reverse_lazy('home')
+    title_page = 'Редактирование изделия'
 
-    return render(request, 'woodmarket/add_product.html', {
-        'title': 'Добавление изделия',
-        'menu': menu,
-        'form': form
-    })
-def contact(request):
-    return HttpResponse("Обратная связь")
+    def get_initial(self):
+        initial = super().get_initial()
+        if self.object.details:
+            initial.update({
+                'warranty_years': self.object.details.warranty_years,
+                'material': self.object.details.material,
+                'size': self.object.details.size
+            })
+        return initial
 
-def login(request):
-    return HttpResponse("Войти")
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        warranty_years = form.cleaned_data.get('warranty_years') or 0
+        material = form.cleaned_data.get('material') or "Не указано"
+        size = form.cleaned_data.get('size') or "Не указано"
 
-def show_category(request, cat_slug):
-    category = get_object_or_404(Category, slug=cat_slug)
-    posts = Product.objects.filter(cat_id=category.pk, is_published=True)
+        if self.object.details:
+            self.object.details.warranty_years = warranty_years
+            self.object.details.material = material
+            self.object.details.size = size
+            self.object.details.save()
+        else:
+            detail = ProductDetails.objects.create(
+                warranty_years=warranty_years,
+                material=material,
+                size=size
+            )
+            self.object.details = detail
+            self.object.save()
 
-    context = {
-        'menu': menu,
-        'title': f'Рубрика: {category.name}',
-        'posts': posts,
-        'cat_selected': category.id,
-    }
+        return response
+class DeleteProduct(DataMixin, DeleteView):
+    model = Product
+    template_name = 'woodmarket/delete_product.html'
+    success_url = reverse_lazy('home')
+    title_page = 'Удаление изделия'
 
-    return render(request, 'woodmarket/index.html', context)
-def show_tag(request, tag_slug):
-    tag = get_object_or_404(Tag, slug=tag_slug)
-    posts = tag.products.filter(is_published=True)
-    categories = Category.objects.all()
+class Contact(DataMixin, TemplateView):
+    template_name = 'woodmarket/contact.html'
+    title_page = 'Обратная связь'
+class Login(DataMixin, TemplateView):
+    template_name = 'woodmarket/login.html'
+    title_page = 'Авторизация'
 
-    context = {
-        'title': f'Тег: {tag.name}',
-        'posts': posts,
-        'categories': categories,
-        'menu': menu,
-        'cat_selected': 0,
-    }
-    return render(request, 'woodmarket/index.html', context)
-def categories_by_slug(request, cat_slug):
-    if request.GET:
-        print(request.GET)
-        return HttpResponse("<h1>Статьи по категориям</h1>")
+class ShowCategory(DataMixin, ListView):
+    template_name = 'woodmarket/index.html'
+    context_object_name = 'posts'
+    def get_queryset(self):
+        self.category = get_object_or_404(Category, slug=self.kwargs['cat_slug'])
+        return Product.published.filter(cat_id=self.category.pk)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return self.get_mixin_context(
+            context,
+            title=f'Рубрика: {self.category.name}',
+            cat_selected=self.category.id
+        )
+class ShowTag(DataMixin, ListView):
+    template_name = 'woodmarket/index.html'
+    context_object_name = 'posts'
+    def get_queryset(self):
+        self.tag = get_object_or_404(Tag, slug=self.kwargs['tag_slug'])
+        return self.tag.products.filter(is_published=True)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['categories'] = Category.objects.all()
+        return self.get_mixin_context(
+            context,
+            title=f'Тег: {self.tag.name}',
+            cat_selected=0
+        )
 
 def page_not_found(request, exception):
     return HttpResponseNotFound('<h1>Страница не найдена</h1>')
 
-def archive(request, year):
-    if year > 2025:
-        return redirect('home', permanent=True)
-    return HttpResponse(f"<h1>Архив по годам</h1><p>{year}</p>")

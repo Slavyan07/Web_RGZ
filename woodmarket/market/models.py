@@ -29,7 +29,7 @@ class Category(models.Model):
 class ProductDetails(models.Model):
     material = models.CharField(max_length=100, blank=True)
     size = models.CharField(max_length=100, blank=True)
-    warranty_years = models.PositiveIntegerField(default=0)
+    warranty_years = models.PositiveIntegerField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.material} | {self.size} | {self.warranty_years} года"
@@ -48,7 +48,7 @@ class Product(models.Model):
     time_create = models.DateTimeField(auto_now_add=True, verbose_name="Время создания")
     time_update = models.DateTimeField(auto_now=True, verbose_name="Время изменения")
     is_published = models.BooleanField(choices=tuple(map(lambda x: (bool(x[0]), x[1]), Status.choices)), default=Status.DRAFT, verbose_name="Статус")
-    details = models.OneToOneField(ProductDetails, on_delete=models.PROTECT,  null=True, blank=True, verbose_name="Характеристики")
+    details = models.OneToOneField(ProductDetails, on_delete=models.CASCADE,  null=True, blank=True, verbose_name="Характеристики")
     photo = models.ImageField(upload_to="photos/%Y/%m/%d/", default=None, blank=True, null=True,verbose_name="Фото")
     class Meta:
         verbose_name = "Изделия"
@@ -62,11 +62,10 @@ class Product(models.Model):
              self.details = ProductDetails.objects.create(
                  material="Не указано",
                  size="Не указано",
-                 warranty_years=2
              )
          super().save(*args, **kwargs)
     def get_absolute_url(self):
-        return reverse('product', kwargs={'product_slug': self.slug})
+        return reverse('product', kwargs={'slug': self.slug})
 
     def __str__(self):
         return self.title
