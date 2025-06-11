@@ -54,10 +54,10 @@ class Product(models.Model):
     photo = models.ImageField(upload_to="photos/%Y/%m/%d/", default=None, blank=True, null=True,verbose_name="Фото")
     author = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name='Автор')
     class Meta:
-        verbose_name = "Изделия"
+        verbose_name = "Мебель"
         permissions = [("social_auth", "Can login with social account"),]
 
-        verbose_name_plural = "Изделия"
+        verbose_name_plural = "Мебель"
         ordering = ['-time_create']
         indexes = [
             models.Index(fields=['-time_create']),

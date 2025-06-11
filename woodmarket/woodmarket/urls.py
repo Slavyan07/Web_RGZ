@@ -23,7 +23,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 import debug_toolbar
 admin.site.site_header = "Панель администрирования"
-admin.site.index_title = "Изделия из дерева"
+admin.site.index_title = "Мебель из дерева"
 
 urlpatterns = [
  path('admin/', admin.site.urls),
