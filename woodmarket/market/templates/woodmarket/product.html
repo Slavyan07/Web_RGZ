@@ -23,8 +23,11 @@
         <li><strong>Материал:</strong> {{ product.details.material }}</li>
         <li><strong>Размер:</strong> {{ product.details.size }}</li>
     </ul>
-
+{% if perms.market.change_product %}
 <p><a href="{{ product.get_absolute_url }}edit">Редактировать запись</a></p>
+{% endif %}
+{% if perms.market.delete_product %}
 <p><a href="{{ product.get_absolute_url }}delete">Удалить запись</a></p>
+{% endif %}
 {% endblock %}
 

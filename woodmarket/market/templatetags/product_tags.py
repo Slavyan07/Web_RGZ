@@ -2,12 +2,17 @@ from django import template
 import market.views as views
 from market.models import Category, Tag
 from django.db.models import Count
+from market.utils import menu
 
 register = template.Library()
 
 @register.simple_tag()
 def get_categories():
  return views.Categories
+
+@register.simple_tag()
+def get_menu():
+    return menu
 
 @register.inclusion_tag('woodmarket/list_categories.html')
 def show_product_categories(cat_selected=0):

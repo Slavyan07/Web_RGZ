@@ -52,6 +52,8 @@ class Product(models.Model):
     photo = models.ImageField(upload_to="photos/%Y/%m/%d/", default=None, blank=True, null=True,verbose_name="Фото")
     class Meta:
         verbose_name = "Изделия"
+        permissions = [("social_auth", "Can login with social account"),]
+
         verbose_name_plural = "Изделия"
         ordering = ['-time_create']
         indexes = [

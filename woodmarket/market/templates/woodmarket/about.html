@@ -1,18 +1,4 @@
-<!DOCTYPE html>
-<html>
-<head>
- <title>{{title}}</title>
-</head>
-<body>
-<ul>
-<li><a href="{% url 'home' %}">Главная</a></li>
-{% for m in menu %}
-{% if not forloop.last %}<li>{% else %}<li
-class="last">{% endif %}
- <a href="{% url m.url_name %}">{{m.title}}</a>
-</li>
-{% endfor %}
-</ul>
+{% extends "base.html" %}
+{% block content %}
 <h1>{{ title }}</h1>
-</body>
-</html>
+{% endblock %}

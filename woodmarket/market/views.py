@@ -1,3 +1,4 @@
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.http import  HttpResponse, HttpResponseNotFound, Http404, HttpResponseRedirect
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
@@ -35,10 +36,15 @@ class ShowProduct(DataMixin, DetailView):
         context = super().get_context_data(**kwargs)
         return self.get_mixin_context(context, title=context['product'].title)
 
-class About(DataMixin, TemplateView):
+class About(LoginRequiredMixin, TemplateView):
     template_name = 'woodmarket/about.html'
     title_page = 'О сайте'
-class AddProduct(DataMixin, CreateView):
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'О сайте'
+        return context
+class AddProduct(LoginRequiredMixin, CreateView):
     model = Product
     template_name = 'woodmarket/add_product.html'
     form_class = AddProductForm
@@ -57,9 +63,10 @@ class AddProduct(DataMixin, CreateView):
         return redirect(self.success_url)
 
 
-class UpdateProduct(DataMixin, UpdateView):
+class UpdateProduct(PermissionRequiredMixin, UpdateView):
     model = Product
     template_name = 'woodmarket/add_product.html'
+    permission_required = 'market.add_product'
     form_class = AddProductForm
     success_url = reverse_lazy('home')
     title_page = 'Редактирование изделия'
@@ -95,18 +102,16 @@ class UpdateProduct(DataMixin, UpdateView):
             self.object.save()
 
         return response
-class DeleteProduct(DataMixin, DeleteView):
+class DeleteProduct(PermissionRequiredMixin, DeleteView):
     model = Product
     template_name = 'woodmarket/delete_product.html'
+    permission_required = 'market.delete_product'
     success_url = reverse_lazy('home')
     title_page = 'Удаление изделия'
 
 class Contact(DataMixin, TemplateView):
     template_name = 'woodmarket/contact.html'
     title_page = 'Обратная связь'
-class Login(DataMixin, TemplateView):
-    template_name = 'woodmarket/login.html'
-    title_page = 'Авторизация'
 
 class ShowCategory(DataMixin, ListView):
     template_name = 'woodmarket/index.html'

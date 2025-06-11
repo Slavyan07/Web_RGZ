@@ -13,20 +13,37 @@
 <tr><td valign="top">
 
 {% block mainmenu %}
+
 	<div class="header">
 		<ul id="mainmenu" class="mainmenu">
 			<li class="logo"><a href="#"><div class="logo"></div></a></li>
-			{% for m in menu %}
-				{% if not forloop.last %}
-					<li><a href="{% url m.url_name %}">{{ m.title }}</a></li>
-				{% else %}
-					<li class="last"><a href="{% url m.url_name %}">{{ m.title }}</a></li>
-				{% endif %}
+			{% for m in mainmenu %}
+    			<li><a href="{% url m.url_name %}">{{ m.title }}</a></li>
 			{% endfor %}
+
+			{% if user.is_authenticated %}
+    <li class="last">
+        <a href="{% url 'users:profile' %}">Профиль ({{ user.username }})</a>
+        |
+        <form method="post" action="{% url 'users:logout' %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" style="background:none; border:none; padding:0; font:inherit; color:inherit; cursor:pointer;">
+                Выйти
+            </button>
+        </form>
+    </li>
+{% else %}
+    <li class="last">
+        <a href="{% url 'users:login' %}">Войти</a> |
+        <a href="{% url 'users:register' %}">Регистрация</a>
+    </li>
+{% endif %}
+
 		</ul>
 		<div class="clear"></div>
 	</div>
 {% endblock mainmenu %}
+
 
 <table class="table-content" border="0" cellpadding="0" cellspacing="0">
 <tr>
@@ -34,6 +51,7 @@
 <!-- Sidebar слева -->
 <td valign="top" class="left-chapters">
 	{% load product_tags %}
+	{% get_menu as menu %}
 	{% show_product_categories %}
 	{% show_all_tags %}
 </td>
