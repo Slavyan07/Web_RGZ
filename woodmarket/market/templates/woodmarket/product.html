@@ -1,6 +1,66 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<style>
+.comment-section {
+    margin-top: 40px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border: 2px solid #ccc;
+    border-radius: 10px;
+}
+.comment-toggle {
+    margin-bottom: 10px;
+    display: inline-block;
+    background-color: #ddd;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.comment-toggle:hover {
+    background-color: #ccc;
+}
+
+.vote-btn {
+    border: none !important;
+    background: none !important;
+    font-size: 1.5em !important;
+    cursor: pointer;
+}
+
+.vote-btn.liked {
+    color: green !important;
+    border: 2px solid green !important;
+    border-radius: 6px;
+}
+
+.vote-btn.disliked {
+    color: red !important;
+    border: 2px solid red !important;
+    border-radius: 6px;
+}
+.product-actions {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 200px;
+}
+
+.product-actions form button {
+    width: 100%;
+    padding: 8px;
+    font-size: 1em;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.product-actions form button:hover {
+    background-color: #e0e0e0;
+}
+</style>
 <p>Теги:
     {% for tag in product.tags.all %}
         <a href="{% url 'tag_slug' tag.slug %}">{{ tag.name }}</a>{% if not forloop.last %}, {% endif %}
@@ -10,7 +70,7 @@
 </p>
 
 <h1>{{ product.title }}</h1>
-
+<p style="color: blue;">Автор: {{ product.author.username|default:"неизвестен" }}</p>
 <p>{{ product.description|linebreaks }}</p>
 
 {% if product.photo %}
@@ -23,11 +83,107 @@
         <li><strong>Материал:</strong> {{ product.details.material }}</li>
         <li><strong>Размер:</strong> {{ product.details.size }}</li>
     </ul>
-{% if perms.market.change_product %}
-<p><a href="{{ product.get_absolute_url }}edit">Редактировать запись</a></p>
+
+<div id="vote-result-{{ product.pk }}">
+    👍 {{ likes }} | 👎 {{ dislikes }}
+</div>
+
+{% if user.is_authenticated %}
+     <button id="like-btn-{{ product.pk }}" onclick="vote({{ product.pk }}, 'like')"
+        class="vote-btn {% if user_vote %}liked{% endif %}">👍</button>
+
+
+     <button id="dislike-btn-{{ product.pk }}" onclick="vote({{ product.pk }}, 'dislike')"
+        class="vote-btn {% if user_vote == False %}disliked{% endif %}">👎</button>
+{% else %}
+    <p><a href="{% url 'users:login' %}?next={{ request.path }}">Войдите</a>, чтобы голосовать.</p>
 {% endif %}
-{% if perms.market.delete_product %}
-<p><a href="{{ product.get_absolute_url }}delete">Удалить запись</a></p>
+
+<div class="product-actions">
+    {% if product.author == user or perms.market.change_product %}
+        <form action="{{ product.get_absolute_url }}edit" method="get">
+            <button type="submit">✏️ Редактировать</button>
+        </form>
+    {% endif %}
+
+    {% if product.author == user or perms.market.delete_product %}
+        <form action="{{ product.get_absolute_url }}delete" method="get";">
+            <button type="submit">🗑 Удалить</button>
+        </form>
+    {% endif %}
+</div>
+
+<div class="comment-section">
+    <div class="comment-toggle" onclick="toggleComments()">💬 Показать / Скрыть комментарии</div>
+
+    <div id="comments-block" style="display: none;">
+        <h3>Комментарии</h3>
+        <ul>
+            {% for comment in comments %}
+                <li>
+    <strong>{{ comment.user.username }}</strong>: {{ comment.content }}
+    {% if perms.market.can_delete_comment %}
+    <form method="post" action="{% url 'delete_comment' comment.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" onclick="return confirm('Удалить комментарий?')">Удалить</button>
+    </form>
 {% endif %}
+</li>
+            {% empty %}
+                <li>Комментариев нет.</li>
+            {% endfor %}
+        </ul>
+
+        {% if user.is_authenticated %}
+        <form method="post">
+            {% csrf_token %}
+            {{ comment_form.as_p }}
+            <button type="submit">Добавить комментарий</button>
+        </form>
+        {% else %}
+        <p><a href="{% url 'users:login' %}?next={{ request.path }}">Войдите</a>, чтобы оставить комментарий.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function toggleComments() {
+    const block = document.getElementById('comments-block');
+    block.style.display = block.style.display === 'none' ? 'block' : 'none';
+}
+
+function vote(productId, type) {
+    fetch(`/product/${productId}/vote/?type=` + type)
+        .then(response => response.json())
+        .then(data => {
+            const voteBlock = document.getElementById(`vote-result-${productId}`);
+            const likeBtn = document.getElementById(`like-btn-${productId}`);
+            const dislikeBtn = document.getElementById(`dislike-btn-${productId}`);
+
+            if (!voteBlock || !likeBtn || !dislikeBtn) return;
+
+            // Обновляем счётчики
+            voteBlock.innerText = `👍 ${data.likes} | 👎 ${data.dislikes}`;
+
+            // Сброс классов
+            likeBtn.classList.remove("liked");
+            dislikeBtn.classList.remove("disliked");
+
+            // Установка классов
+            if (data.user_vote === true) {
+                likeBtn.classList.add("liked");
+            } else if (data.user_vote === false) {
+                dislikeBtn.classList.add("disliked");
+            }
+        });
+}
+
+window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+            window.location.reload();
+        }
+    });
+</script>
+
 {% endblock %}
 

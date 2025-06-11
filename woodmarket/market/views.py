@@ -1,11 +1,12 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.http import  HttpResponse, HttpResponseNotFound, Http404, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseNotFound, Http404, HttpResponseRedirect, JsonResponse, \
+    HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
 from .utils import DataMixin
-from django.core.paginator import Paginator
-
-from .models import Product, Category, Tag, ProductDetails
+from .forms import ContactForm, CommentForm
+from django.contrib.auth.decorators import permission_required, login_required
+from .models import Product, Category, Tag, ProductDetails, Comment, ProductVote
 from .forms import AddProductForm, UploadFileForm
 from django.views.generic import View, ListView, DetailView, FormView, CreateView, UpdateView, DeleteView, TemplateView
 # Create your views here.
@@ -13,7 +14,42 @@ Product.objects.filter(is_published=1)
 
 Categories = Category.objects.all()
 
+@permission_required('market.can_delete_comment', raise_exception=True)
+def delete_comment(request, pk):
+    comment = get_object_or_404(Comment, pk=pk)
+    product_url = comment.product.get_absolute_url()
+    comment.delete()
+    return redirect(product_url)
+@login_required
+@login_required
+def toggle_vote(request, pk):
+    product = get_object_or_404(Product, pk=pk)
+    vote_type = request.GET.get("type")
 
+    if vote_type not in ("like", "dislike"):
+        return JsonResponse({"error": "Неверный тип"}, status=400)
+
+    is_like = vote_type == "like"
+    existing_vote = ProductVote.objects.filter(product=product, user=request.user).first()
+
+    if existing_vote:
+        if existing_vote.is_like == is_like:
+            # Повторное нажатие на ту же кнопку — удаляем голос
+            existing_vote.delete()
+        else:
+            # Переключение с лайка на дизлайк или наоборот
+            existing_vote.is_like = is_like
+            existing_vote.save()
+    else:
+        # Новый голос
+        ProductVote.objects.create(product=product, user=request.user, is_like=is_like)
+
+    return JsonResponse({
+        "likes": product.votes.filter(is_like=True).count(),
+        "dislikes": product.votes.filter(is_like=False).count(),
+        "user_vote": None if not ProductVote.objects.filter(product=product, user=request.user).exists()
+        else ProductVote.objects.get(product=product, user=request.user).is_like
+    })
 class ProductHome(DataMixin, ListView):
     template_name = 'woodmarket/index.html'
     title_page = 'Главная страница'
@@ -24,8 +60,27 @@ class ProductHome(DataMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['cat_selected'] = int(self.request.GET.get('cat_id', 0))
-        return self.get_mixin_context(context)
+        posts = context['posts']  # твои товары
+
+        # Лайки и дизлайки по каждому товару
+        likes = {}
+        dislikes = {}
+        for p in posts:
+            likes[p.pk] = p.votes.filter(is_like=True).count()
+            dislikes[p.pk] = p.votes.filter(is_like=False).count()
+
+        context['likes'] = likes
+        context['dislikes'] = dislikes
+
+        # Голоса текущего пользователя
+        user_votes = {}
+        if self.request.user.is_authenticated:
+            votes = ProductVote.objects.filter(user=self.request.user, product__in=posts)
+            for vote in votes:
+                user_votes[vote.product_id] = vote.is_like
+
+        context['user_votes'] = user_votes
+        return context
 class ShowProduct(DataMixin, DetailView):
     model = Product
     template_name = 'woodmarket/product.html'
@@ -34,7 +89,30 @@ class ShowProduct(DataMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        return self.get_mixin_context(context, title=context['product'].title)
+        context['comments'] = self.object.comments.select_related('user')
+        context['comment_form'] = CommentForm()
+        context['likes'] = self.object.votes.filter(is_like=True).count()
+        context['dislikes'] = self.object.votes.filter(is_like=False).count()
+
+        # Добавляем текущий голос
+        if self.request.user.is_authenticated:
+            vote = self.object.votes.filter(user=self.request.user).first()
+            context['user_vote'] = vote.is_like if vote else None
+        else:
+            context['user_vote'] = None
+
+        return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = CommentForm(request.POST)
+        if form.is_valid() and request.user.is_authenticated:
+            comment = form.save(commit=False)
+            comment.product = self.object
+            comment.user = request.user
+            comment.save()
+            return redirect(self.object.get_absolute_url())
+        return self.render_to_response(self.get_context_data(comment_form=form))
 
 class About(LoginRequiredMixin, TemplateView):
     template_name = 'woodmarket/about.html'
@@ -53,6 +131,7 @@ class AddProduct(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         self.object = form.save(commit=False)
+        self.object.author = self.request.user
         d = ProductDetails.objects.create(
             warranty_years=form.cleaned_data.get('warranty_years') or 0,
             material=form.cleaned_data.get('material') or "Не указано",
@@ -62,15 +141,25 @@ class AddProduct(LoginRequiredMixin, CreateView):
         self.object.save()
         return redirect(self.success_url)
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user  # передаём пользователя в форму
+        return kwargs
 
-class UpdateProduct(PermissionRequiredMixin, UpdateView):
+
+class UpdateProduct(LoginRequiredMixin, UpdateView):
     model = Product
     template_name = 'woodmarket/add_product.html'
-    permission_required = 'market.add_product'
+    permission_required = 'market.change_product'
     form_class = AddProductForm
     success_url = reverse_lazy('home')
     title_page = 'Редактирование изделия'
 
+    def dispatch(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if obj.author != request.user and not request.user.has_perm('market.change_product'):
+            return HttpResponseForbidden("Вы не можете редактировать этот товар.")
+        return super().dispatch(request, *args, **kwargs)
     def get_initial(self):
         initial = super().get_initial()
         if self.object.details:
@@ -102,16 +191,39 @@ class UpdateProduct(PermissionRequiredMixin, UpdateView):
             self.object.save()
 
         return response
-class DeleteProduct(PermissionRequiredMixin, DeleteView):
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user  # передаём пользователя в форму
+        return kwargs
+class DeleteProduct(LoginRequiredMixin, DeleteView):
     model = Product
     template_name = 'woodmarket/delete_product.html'
-    permission_required = 'market.delete_product'
+    permission_required = 'market.del       ete_product'
     success_url = reverse_lazy('home')
     title_page = 'Удаление изделия'
 
-class Contact(DataMixin, TemplateView):
+    def dispatch(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if obj.author != request.user and not request.user.has_perm(self.permission_required):
+            return HttpResponseForbidden("Вы не можете удалить этот товар.")
+        return super().dispatch(request, *args, **kwargs)
+
+class Contact(FormView):
     template_name = 'woodmarket/contact.html'
-    title_page = 'Обратная связь'
+    form_class = ContactForm
+    success_url = reverse_lazy('home')  # или укажи правильное имя для главной
+
+    def get_initial(self):
+        initial = super().get_initial()
+        if self.request.user.is_authenticated:
+            initial['username'] = self.request.user.username
+        else:
+            initial['username'] = 'Гость'
+        return initial
+
+    def form_valid(self, form):
+        # здесь можешь добавить сохранение сообщения
+        return super().form_valid(form)
 
 class ShowCategory(DataMixin, ListView):
     template_name = 'woodmarket/index.html'
@@ -122,11 +234,32 @@ class ShowCategory(DataMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        posts = context['posts']
+
+        # Подсчёт лайков и дизлайков
+        likes = {}
+        dislikes = {}
+        for p in posts:
+            likes[p.pk] = p.votes.filter(is_like=True).count()
+            dislikes[p.pk] = p.votes.filter(is_like=False).count()
+
+        context['likes'] = likes
+        context['dislikes'] = dislikes
+
+        # Голоса текущего пользователя
+        user_votes = {}
+        if self.request.user.is_authenticated:
+            votes = ProductVote.objects.filter(user=self.request.user, product__in=posts)
+            for vote in votes:
+                user_votes[vote.product_id] = vote.is_like
+
+        context['user_votes'] = user_votes
         return self.get_mixin_context(
             context,
             title=f'Рубрика: {self.category.name}',
             cat_selected=self.category.id
         )
+
 class ShowTag(DataMixin, ListView):
     template_name = 'woodmarket/index.html'
     context_object_name = 'posts'
@@ -137,11 +270,32 @@ class ShowTag(DataMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['categories'] = Category.objects.all()
+        posts = context['posts']
+
+        # Подсчёт лайков и дизлайков
+        likes = {}
+        dislikes = {}
+        for p in posts:
+            likes[p.pk] = p.votes.filter(is_like=True).count()
+            dislikes[p.pk] = p.votes.filter(is_like=False).count()
+
+        context['likes'] = likes
+        context['dislikes'] = dislikes
+
+        # Голоса текущего пользователя
+        user_votes = {}
+        if self.request.user.is_authenticated:
+            votes = ProductVote.objects.filter(user=self.request.user, product__in=posts)
+            for vote in votes:
+                user_votes[vote.product_id] = vote.is_like
+
+        context['user_votes'] = user_votes
         return self.get_mixin_context(
             context,
             title=f'Тег: {self.tag.name}',
             cat_selected=0
         )
+
 
 def page_not_found(request, exception):
     return HttpResponseNotFound('<h1>Страница не найдена</h1>')

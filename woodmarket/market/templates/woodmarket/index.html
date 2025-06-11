@@ -1,24 +1,62 @@
 {% extends "base.html" %}
-
+{% load dict_filters %}
 {% block content %}
+<style>
+.vote-btn {
+    border: none;
+    background: none;
+    font-size: 1.1em;
+    cursor: pointer;
+}
 
+button.vote-btn.liked {
+    background-color: #d0ffd0 !important;
+}
+
+button.vote-btn.disliked {
+    background-color: #ffd0d0 !important;
+}
+}
+</style>
 <h1>{{ title }}</h1>
 
 {% if posts %}
     <ul class="post-list">
         {% for p in posts %}
-    <li style="list-style: none; margin-bottom: 30px; border-bottom: 1px solid #ccc; padding-bottom: 20px;">
+    {% with user_vote=user_votes|dict_get:p.pk %}
+<li class="{% if user_vote is True %}post-liked{% elif user_vote is False %}post-disliked{% endif %}"
+    style="list-style: none; margin-bottom: 30px; border-bottom: 1px solid #ccc; padding-bottom: 20px;">
+{% endwith %}
+
         <div class="article-panel">
             <p class="first" style="margin: 0; font-weight: bold;">Категория: {{ p.cat.name }}</p>
             <p class="last" style="margin: 0; font-size: 0.9em; color: #666;">
             <p class="last">Дата: {{ p.time_update|date:"d-m-Y H:i:s" }}</p>
         </div>
 
-        {% if p.photo %}
-        <p><img class="img-article-left thumb" src="{{ p.photo.url }}"></p>
-        {% endif %}
+        <p class="last" style="margin: 1; font-size: 0.9em; color: #666;">
+    Автор: {{ p.author.username|default:"неизвестен" }}
+</p>
+        {% with vote_like=likes|dict_get:p.pk vote_dislike=dislikes|dict_get:p.pk user_vote=user_votes|dict_get:p.pk %}
+    <div id="vote-result-{{ p.pk }}">
+        👍 {{ vote_like|default:"0" }} | 👎 {{ vote_dislike|default:"0" }}
+    </div>
 
+    {% if user.is_authenticated %}
+        <button id="like-btn-{{ p.pk }}" onclick="vote({{ p.pk }}, 'like')"
+            class="vote-btn {% if user_vote %}liked{% endif %}">👍</button>
+
+        <button id="dislike-btn-{{ p.pk }}" onclick="vote({{ p.pk }}, 'dislike')"
+            class="vote-btn {% if user_vote == False %}disliked{% endif %}">👎</button>
+    {% endif %}
+{% endwith %}
         <h2>{{ p.title }}</h2>
+        {% if p.photo %}
+
+<p>
+    <img src="{{ p.photo.url }}" style="max-width: 250px; height: auto; display: block; margin-bottom: 10px;">
+</p>
+{% endif %}
         <p>{{ p.description }}</p>
         <a href="{{ p.get_absolute_url }}">Читать подробнее</a>
     </li>  {# ← вот этого не хватало #}
@@ -57,5 +95,36 @@
     </ul>
 </nav>
 {% endif %}
+<script>
+function vote(productId, type) {
+    fetch(`/product/${productId}/vote/?type=` + type)
+        .then(response => response.json())
+        .then(data => {
+            const voteBlock = document.getElementById(`vote-result-${productId}`);
+            const likeBtn = document.getElementById(`like-btn-${productId}`);
+            const dislikeBtn = document.getElementById(`dislike-btn-${productId}`);
 
+            if (!voteBlock || !likeBtn || !dislikeBtn) return;
+
+            // Обновляем счётчики
+            voteBlock.innerText = `👍 ${data.likes} | 👎 ${data.dislikes}`;
+
+            // Сбрасываем классы
+            likeBtn.classList.remove("liked");
+            dislikeBtn.classList.remove("disliked");
+
+            // Подсветка активной кнопки
+            if (data.user_vote === true) {
+                likeBtn.classList.add("liked");
+            } else if (data.user_vote === false) {
+                dislikeBtn.classList.add("disliked");
+            }
+        });
+}
+window.addEventListener('pageshow', function(event) {
+    if (event.persisted) {
+        window.location.reload();
+    }
+});
+</script>
 {% endblock %}

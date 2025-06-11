@@ -1,5 +1,5 @@
 from django import forms
-from .models import Category, ProductDetails
+from .models import Category, ProductDetails, Comment
 from django.core.validators import MinLengthValidator, MaxLengthValidator
 from django.core.exceptions import ValidationError
 from django.utils.deconstruct import deconstructible
@@ -19,7 +19,10 @@ class RussianValidator:
 class UploadFileForm(forms.Form):
     file = forms.ImageField(label="Изображение")
 class AddProductForm(forms.ModelForm):
-    warranty_years = forms.CharField(label='Срок гарантии', required=False)
+    warranty_years = forms.IntegerField(label='Срок гарантии', required=False,  min_value=0, max_value=50, error_messages={
+            'invalid': 'Введите целое число.',
+            'min_value': 'Значение не может быть отрицательным.'
+        })
     material = forms.CharField(label='Материал', required=False)
     size = forms.CharField(label='Размер', required=False)
 
@@ -55,71 +58,17 @@ class AddProductForm(forms.ModelForm):
 
         return title
 
-    # title = forms.CharField(
-    #     max_length=255,
-    #     min_length=5,
-    #     label="Название",
-    #     widget=forms.TextInput(attrs={
-    #         'class': 'form-input',
-    #         'placeholder': 'Введите название'
-    #     }),
-    # )
-    # def clean_title(self):
-    #     title = self.cleaned_data['title']
-    #     allowed = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЬЫЪЭЮЯабвгдеёжзийклмнопрстуфхцчшщьыъэюя0123456789- "
-    #
-    #     if not set(title) <= set(allowed):
-    #         raise forms.ValidationError("Название должно содержать только русские буквы, цифры, дефис и пробел.")
-    #
-    #     return title
-    #
-    # slug = forms.SlugField(
-    #     label="URL (слаг)",
-    #     widget=forms.TextInput(attrs={
-    #         'class': 'form-input',
-    #         'placeholder': 'только латиница, дефис и цифры'
-    #     }),
-    #     validators=[
-    #         MinLengthValidator(5),
-    #         MaxLengthValidator(100)
-    #     ]
-    # )
-    #
-    # description = forms.CharField(
-    #     required=False,
-    #     label="Описание",
-    #     widget=forms.Textarea(attrs={
-    #         'class': 'form-textarea',
-    #         'cols': 60,
-    #         'rows': 5,
-    #         'placeholder': 'Описание изделия (необязательно)'
-    #     })
-    # )
-    #
-    # is_published = forms.BooleanField(
-    #     required=False,
-    #     label="Опубликовать",
-    #     initial=True,
-    #     widget=forms.CheckboxInput(attrs={
-    #         'class': 'form-checkbox'
-    #     })
-    # )
-    #
-    # cat = forms.ModelChoiceField(
-    #     queryset=Category.objects.all(),
-    #     label="Категория",
-    #     empty_label="Выберите категорию",
-    #     widget=forms.Select(attrs={
-    #         'class': 'form-select'
-    #     })
-    # )
-    #
-    # details = forms.ModelChoiceField(
-    #     queryset=ProductDetails.objects.all(),
-    #     required=False,
-    #     label="Характеристики",
-    #     empty_label="Не выбрано",
-    #     widget=forms.Select(attrs={
-    #         'class': 'form-select'
-    #     })
-    # )
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)  # заберём пользователя из аргументов
+        super().__init__(*args, **kwargs)
+
+        if user and not user.is_staff:
+            self.fields.pop('is_published')  # скрыть поле для обычных пользователей
+class ContactForm(forms.Form):
+    username = forms.CharField(label='Никнейм', disabled=True)
+    message = forms.CharField(label='Сообщение', widget=forms.Textarea,)
+
+class CommentForm(forms.ModelForm):
+    class Meta:
+        model = Comment
+        fields = ['content']

@@ -1,11 +1,12 @@
 menu = [
+    {'title': "Главная страница", 'url_name': 'home'},
     {'title': "О сайте", 'url_name': 'about'},
     {'title': "Добавить изделие", 'url_name': 'add_product'},
     {'title': "Обратная связь", 'url_name': 'contact'},
 ]
 
 class DataMixin:
-    paginate_by = 2
+    paginate_by = 5
     title_page = None
     extra_context = {}
 
