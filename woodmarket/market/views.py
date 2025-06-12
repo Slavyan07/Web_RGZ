@@ -122,12 +122,12 @@ class About(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         context['title'] = 'О сайте'
         return context
-class AddProduct(LoginRequiredMixin, CreateView):
+class AddProduct(LoginRequiredMixin, DataMixin, CreateView):
     model = Product
     template_name = 'woodmarket/add_product.html'
     form_class = AddProductForm
     success_url = reverse_lazy('home')
-    title_page = 'Добавление изделия'
+    title_page = 'Добавление мебели'
 
     def form_valid(self, form):
         self.object = form.save(commit=False)
@@ -146,14 +146,18 @@ class AddProduct(LoginRequiredMixin, CreateView):
         kwargs['user'] = self.request.user  # передаём пользователя в форму
         return kwargs
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return self.get_mixin_context(context)
 
-class UpdateProduct(LoginRequiredMixin, UpdateView):
+
+class UpdateProduct(LoginRequiredMixin, DataMixin, UpdateView):
     model = Product
     template_name = 'woodmarket/add_product.html'
     permission_required = 'market.change_product'
     form_class = AddProductForm
     success_url = reverse_lazy('home')
-    title_page = 'Редактирование изделия'
+    title_page = 'Редактирование данных о мебели'
 
     def dispatch(self, request, *args, **kwargs):
         obj = self.get_object()
@@ -195,6 +199,9 @@ class UpdateProduct(LoginRequiredMixin, UpdateView):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user  # передаём пользователя в форму
         return kwargs
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return self.get_mixin_context(context)
 class DeleteProduct(LoginRequiredMixin, DeleteView):
     model = Product
     template_name = 'woodmarket/delete_product.html'

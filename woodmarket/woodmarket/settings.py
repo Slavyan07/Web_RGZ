@@ -138,6 +138,8 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "balzhinimaevslavik1@gmail.com"
 EMAIL_HOST_PASSWORD = "mzpp eznx rxdi bwgb"
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+SERVER_EMAIL = EMAIL_HOST_USER
+EMAIL_ADMIN = EMAIL_HOST_USER
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
