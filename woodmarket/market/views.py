@@ -1,4 +1,5 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse, HttpResponseNotFound, Http404, HttpResponseRedirect, JsonResponse, \
     HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
@@ -14,12 +15,15 @@ Product.objects.filter(is_published=1)
 
 Categories = Category.objects.all()
 
-@permission_required('market.can_delete_comment', raise_exception=True)
+@login_required
 def delete_comment(request, pk):
     comment = get_object_or_404(Comment, pk=pk)
-    product_url = comment.product.get_absolute_url()
-    comment.delete()
-    return redirect(product_url)
+
+    if request.user == comment.user or request.user.has_perm('market.can_delete_comment'):
+        comment.delete()
+        return redirect(comment.product.get_absolute_url())
+    else:
+        raise PermissionDenied
 @login_required
 @login_required
 def toggle_vote(request, pk):

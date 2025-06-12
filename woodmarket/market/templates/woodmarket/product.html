@@ -122,7 +122,7 @@
             {% for comment in comments %}
                 <li>
     <strong>{{ comment.user.username }}</strong>: {{ comment.content }}
-    {% if perms.market.can_delete_comment %}
+   {% if perms.market.can_delete_comment or comment.user == user %}
     <form method="post" action="{% url 'delete_comment' comment.pk %}" style="display:inline;">
         {% csrf_token %}
         <button type="submit" onclick="return confirm('Удалить комментарий?')">Удалить</button>
